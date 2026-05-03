@@ -85,15 +85,15 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAssetService, AssetService>();
 builder.Services.AddScoped<IVulnerabilityService, VulnerabilityService>();
-builder.Services.AddScoped<IDiscoveryService, DiscoveryService>();
 builder.Services.AddScoped<IRiskService, RiskService>();
 builder.Services.AddScoped<IThreatIntelService, ThreatIntelService>();
 builder.Services.AddScoped<ISiemService, SiemService>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 builder.Services.AddScoped<IGraphService, GraphService>();
-builder.Services.AddScoped<IGlpiService, GlpiService>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
+builder.Services.AddScoped<DataSeeder>();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddHttpClient<IDiscoveryService, DiscoveryService>();
 builder.Services.AddHttpClient<IGlpiService, GlpiService>();
 
@@ -154,11 +154,11 @@ builder.Services.AddHealthChecks()
 // ─── Build ────────────────────────────────────────────────
 var app = builder.Build();
 
-// ─── Auto-migrate ─────────────────────────────────────────
+// ─── Auto-migrate and Seed ────────────────────────────────
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    var seeder = scope.ServiceProvider.GetRequiredService<DataSeeder>();
+    await seeder.SeedAsync();
 }
 
 // ─── Middleware pipeline ──────────────────────────────────
