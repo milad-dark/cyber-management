@@ -1,0 +1,168 @@
+version: '3.9'
+
+services:
+  # ─── PostgreSQL ───────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: cyber_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-cyber_management}
+      POSTGRES_USER: ${POSTGRES_USER:-cyber_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-StrongPostgresPass!2024}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cyber_admin} -d ${POSTGRES_DB:-cyber_management}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cyber_net
+
+  # ─── Redis ────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: cyber_redis
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD:-StrongRedisPass!2024}
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-StrongRedisPass!2024}", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - cyber_net
+
+  # ─── Neo4j ────────────────────────────────────────────────
+  neo4j:
+    image: neo4j:5-community
+    container_name: cyber_neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-StrongNeo4jPass!2024}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_apoc_export_file_enabled: "true"
+      NEO4J_apoc_import_file_enabled: "true"
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - ./database/neo4j/init.cypher:/var/lib/neo4j/import/init.cypher:ro
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - cyber_net
+
+  # ─── .NET Backend ─────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cyber_backend
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Production}
+      ConnectionStrings__DefaultConnection: "Host=${POSTGRES_HOST:-postgres};Port=${POSTGRES_PORT:-5432};Database=${POSTGRES_DB:-cyber_management};Username=${POSTGRES_USER:-cyber_admin};Password=${POSTGRES_PASSWORD:-StrongPostgresPass!2024}"
+      Redis__ConnectionString: "${REDIS_HOST:-redis}:${REDIS_PORT:-6379},password=${REDIS_PASSWORD:-StrongRedisPass!2024}"
+      Neo4j__Uri: "bolt://${NEO4J_HOST:-neo4j}:${NEO4J_BOLT_PORT:-7687}"
+      Neo4j__Username: ${NEO4J_USER:-neo4j}
+      Neo4j__Password: ${NEO4J_PASSWORD:-StrongNeo4jPass!2024}
+      Jwt__Secret: ${JWT_SECRET:-your-super-secret-jwt-key-minimum-32-chars!!}
+      Jwt__Issuer: ${JWT_ISSUER:-CyberManagementPlatform}
+      Jwt__Audience: ${JWT_AUDIENCE:-CyberManagementUsers}
+      Jwt__ExpiryHours: ${JWT_EXPIRY_HOURS:-8}
+      DiscoveryEngine__BaseUrl: "http://discovery-engine:${DISCOVERY_ENGINE_PORT:-8001}"
+      DiscoveryEngine__Secret: ${DISCOVERY_ENGINE_SECRET:-discovery-engine-secret-key}
+      Glpi__Url: ${GLPI_URL:-}
+      Glpi__AppToken: ${GLPI_APP_TOKEN:-}
+      Glpi__UserToken: ${GLPI_USER_TOKEN:-}
+      Siem__SyslogHost: ${SIEM_SYSLOG_HOST:-}
+      Siem__SyslogPort: ${SIEM_SYSLOG_PORT:-514}
+      Siem__WebhookUrl: ${SIEM_WEBHOOK_URL:-}
+      Siem__Enabled: ${SIEM_ENABLED:-false}
+    ports:
+      - "${BACKEND_PORT:-5000}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cyber_net
+
+  # ─── Discovery Engine ─────────────────────────────────────
+  discovery-engine:
+    build:
+      context: ./discovery-engine
+      dockerfile: Dockerfile
+    container_name: cyber_discovery
+    restart: unless-stopped
+    environment:
+      POSTGRES_URL: "postgresql://${POSTGRES_USER:-cyber_admin}:${POSTGRES_PASSWORD:-StrongPostgresPass!2024}@${POSTGRES_HOST:-postgres}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-cyber_management}"
+      REDIS_URL: "redis://:${REDIS_PASSWORD:-StrongRedisPass!2024}@${REDIS_HOST:-redis}:${REDIS_PORT:-6379}/0"
+      DISCOVERY_ENGINE_SECRET: ${DISCOVERY_ENGINE_SECRET:-discovery-engine-secret-key}
+    ports:
+      - "${DISCOVERY_ENGINE_PORT:-8001}:8001"
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - cyber_net
+
+  # ─── Frontend (Nginx) ─────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    container_name: cyber_frontend
+    restart: unless-stopped
+    networks:
+      - cyber_net
+
+  # ─── Nginx Reverse Proxy ──────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: cyber_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+      - frontend
+      - discovery-engine
+    networks:
+      - cyber_net
+
+volumes:
+  postgres_data:
+  redis_data:
+  neo4j_data:
+  neo4j_logs:
+
+networks:
+  cyber_net:
+    driver: bridge
