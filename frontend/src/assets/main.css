@@ -1,0 +1,125 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --color-bg: #0a0e1a;
+  --color-card: #0d1326;
+  --color-border: #1e2d4a;
+  --color-text: #c9d7f0;
+  --color-text-muted: #6b8ab0;
+  --color-glow: #00d4ff;
+  --color-primary: #4c6ef5;
+  --color-success: #51cf66;
+  --color-warning: #ffa94d;
+  --color-danger: #ff6b6b;
+  --color-critical: #ff4757;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  direction: rtl;
+  font-family: 'Vazirmatn', 'IRANSans', Tahoma, sans-serif;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
+}
+
+/* Cards */
+.cyber-card {
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+}
+
+/* Badge severity */
+.badge-critical { @apply bg-red-900/50 text-red-400 border border-red-800 text-xs px-2 py-0.5 rounded-full; }
+.badge-high     { @apply bg-orange-900/50 text-orange-400 border border-orange-800 text-xs px-2 py-0.5 rounded-full; }
+.badge-medium   { @apply bg-yellow-900/50 text-yellow-400 border border-yellow-800 text-xs px-2 py-0.5 rounded-full; }
+.badge-low      { @apply bg-green-900/50 text-green-400 border border-green-800 text-xs px-2 py-0.5 rounded-full; }
+.badge-info     { @apply bg-blue-900/50 text-blue-400 border border-blue-800 text-xs px-2 py-0.5 rounded-full; }
+
+/* Status */
+.status-active        { @apply bg-green-900/50 text-green-400; }
+.status-inactive      { @apply bg-gray-800 text-gray-400; }
+.status-maintenance   { @apply bg-yellow-900/50 text-yellow-400; }
+.status-decommissioned{ @apply bg-red-900/50 text-red-400; }
+
+/* Buttons */
+.btn-primary {
+  @apply bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-medium transition-colors;
+}
+.btn-secondary {
+  @apply bg-transparent border border-blue-600/50 hover:border-blue-500 text-blue-400 px-4 py-2 rounded-lg font-medium transition-colors;
+}
+.btn-danger {
+  @apply bg-red-700 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-medium transition-colors;
+}
+
+/* Table */
+.cyber-table {
+  @apply w-full;
+}
+.cyber-table th {
+  @apply text-xs font-semibold text-blue-300 uppercase tracking-wider py-3 px-4 text-right border-b border-blue-900/30;
+}
+.cyber-table td {
+  @apply py-3 px-4 text-sm text-gray-300 border-b border-gray-800/50;
+}
+.cyber-table tr:hover td {
+  background: rgba(59, 130, 246, 0.05);
+}
+
+/* Input */
+.cyber-input {
+  @apply bg-gray-900 border border-gray-700 text-gray-200 rounded-lg px-3 py-2 text-sm
+         focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent
+         placeholder-gray-500 w-full;
+}
+
+/* Sidebar */
+.sidebar-link {
+  @apply flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium
+         text-gray-400 hover:text-white hover:bg-blue-900/30 transition-all cursor-pointer;
+}
+.sidebar-link.active {
+  @apply text-white bg-blue-900/50 border-r-2 border-blue-500;
+}
+
+/* Animations */
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(0, 212, 255, 0.3); }
+  50% { box-shadow: 0 0 20px rgba(0, 212, 255, 0.6); }
+}
+.glow-pulse { animation: pulse-glow 2s ease-in-out infinite; }
+
+/* RTL overrides */
+.text-right { text-align: right !important; }
+input, select, textarea { text-align: right; }
