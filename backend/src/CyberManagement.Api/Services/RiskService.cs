@@ -16,6 +16,11 @@ public class RiskService : IRiskService
     private readonly AppDbContext _db;
     private readonly ILogger<RiskService> _logger;
 
+    // Risk score weighting factors (must sum to 1.0)
+    private const decimal VulnerabilityWeight = 0.5m;
+    private const decimal ExposureWeight = 0.2m;
+    private const decimal CriticalityWeight = 0.3m;
+
     public RiskService(AppDbContext db, ILogger<RiskService> logger)
     {
         _db = db;
@@ -84,7 +89,7 @@ public class RiskService : IRiskService
             _ => 50m
         };
 
-        var overallScore = Math.Round((vulnScore * 0.5m + exposureScore * 0.2m + criticalityScore * 0.3m), 2);
+        var overallScore = Math.Round((vulnScore * VulnerabilityWeight + exposureScore * ExposureWeight + criticalityScore * CriticalityWeight), 2);
 
         var existing = await _db.RiskScores.FirstOrDefaultAsync(r => r.AssetId == assetId);
         if (existing == null)

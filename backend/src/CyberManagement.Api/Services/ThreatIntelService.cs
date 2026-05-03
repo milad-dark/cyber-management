@@ -81,21 +81,26 @@ public class ThreatIntelService : IThreatIntelService
 
     public async Task MatchThreatsToAssetsAsync()
     {
-        var threats = await _db.ThreatIntel.Where(t => t.IsActive && t.IocType == "ip").ToListAsync();
-        var assets = await _db.Assets.ToListAsync();
+        var ipThreats = await _db.ThreatIntel
+            .Where(t => t.IsActive && t.IocType == "ip")
+            .ToListAsync();
 
-        foreach (var threat in threats)
+        foreach (var threat in ipThreats)
         {
-            var matchedAssets = assets.Where(a => a.IpAddress == threat.IocValue).ToList();
-            foreach (var asset in matchedAssets)
+            var matchedAssetIds = await _db.Assets
+                .Where(a => a.IpAddress == threat.IocValue)
+                .Select(a => a.Id)
+                .ToListAsync();
+
+            foreach (var assetId in matchedAssetIds)
             {
                 var existing = await _db.AssetIocMatches
-                    .AnyAsync(m => m.AssetId == asset.Id && m.ThreatId == threat.Id);
+                    .AnyAsync(m => m.AssetId == assetId && m.ThreatId == threat.Id);
                 if (!existing)
                 {
                     _db.AssetIocMatches.Add(new AssetIocMatch
                     {
-                        AssetId = asset.Id,
+                        AssetId = assetId,
                         ThreatId = threat.Id,
                         MatchField = "ip_address"
                     });
