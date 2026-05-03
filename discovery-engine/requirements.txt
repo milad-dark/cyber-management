@@ -10,5 +10,5 @@ pysnmp==6.2.4
 httpx==0.27.0
 psutil==5.9.8
 netaddr==1.2.1
-python-multipart==0.0.9
+python-multipart==0.0.22
 loguru==0.7.2
