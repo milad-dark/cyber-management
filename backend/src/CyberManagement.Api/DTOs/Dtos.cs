@@ -86,6 +86,42 @@ public class AssetFilterRequest
     public string SortDir { get; set; } = "desc";
 }
 
+// ─── Advanced / Federated Search ─────────────────────────
+public class AdvancedAssetSearchRequest
+{
+    /// <summary>Global free-text keyword — matched across name, hostname, IP, MAC, OS, description</summary>
+    public string? Keyword { get; set; }
+    public string? Hostname { get; set; }
+    public string? IpAddress { get; set; }
+    public string? MacAddress { get; set; }
+    public string? AssetType { get; set; }
+    public string? OsName { get; set; }
+    public string? Owner { get; set; }
+    public string? Status { get; set; }
+    public string? Criticality { get; set; }
+    public string? RiskLevel { get; set; }
+    public DateTime? DiscoveredFrom { get; set; }
+    public DateTime? DiscoveredTo { get; set; }
+    public string? Cpe { get; set; }
+    public string? SoftwareName { get; set; }
+    public string? SoftwareVersion { get; set; }
+    public string? SoftwareVendor { get; set; }
+    /// <summary>When true, results are also fetched from GLPI and merged</summary>
+    public bool IncludeGlpi { get; set; } = false;
+    public int Page { get; set; } = 1;
+    public int PageSize { get; set; } = 20;
+    public string SortBy { get; set; } = "name";
+    public string SortDir { get; set; } = "asc";
+}
+
+public class UnifiedAssetDto : AssetDto
+{
+    /// <summary>"internal" or "glpi"</summary>
+    public string Source { get; set; } = "internal";
+    /// <summary>Field name that matched the search keyword (for highlighting hints)</summary>
+    public string? MatchedField { get; set; }
+}
+
 // ─── Port ─────────────────────────────────────────────────
 public class PortDto
 {

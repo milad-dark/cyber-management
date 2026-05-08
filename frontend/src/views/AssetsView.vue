@@ -6,15 +6,20 @@
         <h2 class="text-lg font-semibold text-white">فهرست دارایی‌ها</h2>
         <p class="text-sm text-gray-500">مدیریت و مشاهده دارایی‌های سایبری</p>
       </div>
-      <button @click="showCreate = true" class="btn-primary flex items-center gap-2">
-        <span>➕</span> دارایی جدید
-      </button>
+      <div class="flex gap-2">
+        <button @click="toggleAdvancedSearch" class="btn-secondary flex items-center gap-2 text-sm">
+          <span>🔍</span> {{ showAdvanced ? 'جستجوی ساده' : 'جستجوی پیشرفته' }}
+        </button>
+        <button @click="showCreate = true" class="btn-primary flex items-center gap-2">
+          <span>➕</span> دارایی جدید
+        </button>
+      </div>
     </div>
 
-    <!-- Filters -->
-    <div class="cyber-card mb-4">
+    <!-- Basic Filters -->
+    <div v-if="!showAdvanced" class="cyber-card mb-4">
       <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <input v-model="filter.search" @input="debouncedLoad" class="cyber-input" placeholder="جستجو..." />
+        <input v-model="filter.search" @input="debouncedLoad" class="cyber-input" placeholder="جستجوی سریع..." />
         <select v-model="filter.assetType" @change="loadAssets" class="cyber-input">
           <option value="">همه انواع</option>
           <option value="server">سرور</option>
@@ -36,7 +41,114 @@
           <option value="medium">متوسط</option>
           <option value="low">پایین</option>
         </select>
-        <button @click="resetFilter" class="btn-secondary">پاک کردن فیلترها</button>
+        <button @click="resetFilter" class="btn-secondary">پاک کردن</button>
+      </div>
+    </div>
+
+    <!-- Advanced Search Panel -->
+    <div v-else class="cyber-card mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-semibold text-blue-400">🔍 جستجوی پیشرفته</h3>
+        <button @click="resetAdvancedSearch" class="text-xs text-gray-400 hover:text-white">پاک کردن همه</button>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-3">
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">کلیدواژه (جستجوی کلی)</label>
+          <input v-model="advSearch.keyword" @input="debouncedAdvSearch" class="cyber-input" placeholder="نام، IP، hostname، توضیحات..." />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">Hostname</label>
+          <input v-model="advSearch.hostname" @input="debouncedAdvSearch" class="cyber-input" placeholder="server01.local" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">آدرس IP</label>
+          <input v-model="advSearch.ipAddress" @input="debouncedAdvSearch" class="cyber-input" placeholder="192.168.1.1" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">آدرس MAC</label>
+          <input v-model="advSearch.macAddress" @input="debouncedAdvSearch" class="cyber-input" placeholder="AA:BB:CC:DD:EE:FF" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">نوع دارایی</label>
+          <select v-model="advSearch.assetType" @change="runAdvancedSearch" class="cyber-input">
+            <option value="">همه انواع</option>
+            <option value="server">سرور</option>
+            <option value="workstation">ایستگاه کاری</option>
+            <option value="network">تجهیزات شبکه</option>
+            <option value="iot">IoT</option>
+            <option value="mobile">موبایل</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">سیستم‌عامل</label>
+          <input v-model="advSearch.osName" @input="debouncedAdvSearch" class="cyber-input" placeholder="Linux، Windows..." />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">مالک / کاربر</label>
+          <input v-model="advSearch.owner" @input="debouncedAdvSearch" class="cyber-input" placeholder="نام یا نام کاربری" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">وضعیت</label>
+          <select v-model="advSearch.status" @change="runAdvancedSearch" class="cyber-input">
+            <option value="">همه وضعیت‌ها</option>
+            <option value="active">فعال</option>
+            <option value="inactive">غیرفعال</option>
+            <option value="maintenance">تعمیرات</option>
+            <option value="decommissioned">بازنشسته</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">اهمیت</label>
+          <select v-model="advSearch.criticality" @change="runAdvancedSearch" class="cyber-input">
+            <option value="">همه سطوح</option>
+            <option value="critical">بحرانی</option>
+            <option value="high">بالا</option>
+            <option value="medium">متوسط</option>
+            <option value="low">پایین</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">سطح ریسک</label>
+          <select v-model="advSearch.riskLevel" @change="runAdvancedSearch" class="cyber-input">
+            <option value="">همه سطوح</option>
+            <option value="critical">بحرانی (≥75)</option>
+            <option value="high">بالا (50–74)</option>
+            <option value="medium">متوسط (25–49)</option>
+            <option value="low">پایین (&lt;25)</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">کشف‌شده از تاریخ</label>
+          <input v-model="advSearch.discoveredFrom" @change="runAdvancedSearch" type="date" class="cyber-input" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">کشف‌شده تا تاریخ</label>
+          <input v-model="advSearch.discoveredTo" @change="runAdvancedSearch" type="date" class="cyber-input" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">CPE</label>
+          <input v-model="advSearch.cpe" @input="debouncedAdvSearch" class="cyber-input" placeholder="cpe:/o:..." />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">نام نرم‌افزار</label>
+          <input v-model="advSearch.softwareName" @input="debouncedAdvSearch" class="cyber-input" placeholder="Apache، OpenSSH..." />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">نسخه نرم‌افزار</label>
+          <input v-model="advSearch.softwareVersion" @input="debouncedAdvSearch" class="cyber-input" placeholder="2.4.51" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-400 block mb-1">سازنده نرم‌افزار</label>
+          <input v-model="advSearch.softwareVendor" @input="debouncedAdvSearch" class="cyber-input" placeholder="Microsoft، Apache..." />
+        </div>
+      </div>
+      <div class="flex items-center gap-4 pt-2 border-t border-gray-800">
+        <label class="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
+          <input type="checkbox" v-model="advSearch.includeGlpi" @change="runAdvancedSearch" class="rounded border-gray-600 bg-gray-800 text-blue-500" />
+          <span>شامل نتایج GLPI</span>
+        </label>
+        <button @click="runAdvancedSearch" class="btn-primary text-sm px-4 py-1.5">اجرای جستجو</button>
+        <span v-if="advSearchActive" class="text-xs text-blue-400">{{ total }} نتیجه یافت شد</span>
       </div>
     </div>
 
@@ -49,15 +161,29 @@
       <table v-else class="cyber-table">
         <thead>
           <tr>
-            <th>نام / Hostname</th>
-            <th>آدرس IP</th>
+            <th @click="sortBy('name')" class="cursor-pointer select-none">
+              نام / Hostname <span class="text-gray-500 text-xs">{{ sortIcon('name') }}</span>
+            </th>
+            <th @click="sortBy('ipAddress')" class="cursor-pointer select-none">
+              آدرس IP <span class="text-gray-500 text-xs">{{ sortIcon('ipAddress') }}</span>
+            </th>
             <th>نوع</th>
-            <th>سیستم‌عامل</th>
-            <th>وضعیت</th>
-            <th>اهمیت</th>
+            <th @click="sortBy('osName')" class="cursor-pointer select-none">
+              سیستم‌عامل <span class="text-gray-500 text-xs">{{ sortIcon('osName') }}</span>
+            </th>
+            <th @click="sortBy('status')" class="cursor-pointer select-none">
+              وضعیت <span class="text-gray-500 text-xs">{{ sortIcon('status') }}</span>
+            </th>
+            <th @click="sortBy('criticality')" class="cursor-pointer select-none">
+              اهمیت <span class="text-gray-500 text-xs">{{ sortIcon('criticality') }}</span>
+            </th>
             <th>آسیب‌پذیری</th>
-            <th>امتیاز ریسک</th>
-            <th>آخرین مشاهده</th>
+            <th @click="sortBy('riskScore')" class="cursor-pointer select-none">
+              امتیاز ریسک <span class="text-gray-500 text-xs">{{ sortIcon('riskScore') }}</span>
+            </th>
+            <th @click="sortBy('lastSeen')" class="cursor-pointer select-none">
+              آخرین مشاهده <span class="text-gray-500 text-xs">{{ sortIcon('lastSeen') }}</span>
+            </th>
             <th></th>
           </tr>
         </thead>
@@ -67,12 +193,13 @@
           </tr>
           <tr v-for="asset in assets" :key="asset.id" class="cursor-pointer" @click="$router.push(`/assets/${asset.id}`)">
             <td>
-              <div class="font-medium text-white">{{ asset.name }}</div>
-              <div class="text-xs text-gray-500">{{ asset.hostname }}</div>
+              <div class="font-medium text-white" v-html="highlight(asset.name)"></div>
+              <div class="text-xs text-gray-500" v-html="highlight(asset.hostname || '')"></div>
+              <span v-if="asset.source === 'glpi'" class="text-xs bg-purple-900/40 text-purple-300 px-1.5 py-0.5 rounded mr-1">GLPI</span>
             </td>
-            <td class="font-mono text-blue-300">{{ asset.ipAddress || '-' }}</td>
+            <td class="font-mono text-blue-300" v-html="highlight(asset.ipAddress || '-')"></td>
             <td>{{ typeIcon(asset.assetType) }} {{ assetTypeFa(asset.assetType) }}</td>
-            <td class="text-gray-400">{{ asset.osName || '-' }}</td>
+            <td class="text-gray-400" v-html="highlight(asset.osName || '-')"></td>
             <td>
               <span class="text-xs px-2 py-0.5 rounded-full" :class="statusClass(asset.status)">
                 {{ statusFa(asset.status) }}
@@ -180,8 +307,25 @@ const page = ref(1)
 const pageSize = 20
 const showCreate = ref(false)
 const creating = ref(false)
+const showAdvanced = ref(false)
+const advSearchActive = ref(false)
 
+// Sort state
+const currentSort = ref('name')
+const currentSortDir = ref('asc')
+
+// Basic filter
 const filter = ref({ search: '', assetType: '', status: '', criticality: '' })
+
+// Advanced search
+const advSearch = ref({
+  keyword: '', hostname: '', ipAddress: '', macAddress: '',
+  assetType: '', osName: '', owner: '', status: '', criticality: '',
+  riskLevel: '', discoveredFrom: '', discoveredTo: '',
+  cpe: '', softwareName: '', softwareVersion: '', softwareVendor: '',
+  includeGlpi: false
+})
+
 const newAsset = ref({ name: '', hostname: '', ipAddress: '', assetType: 'server', osName: '', criticality: 'medium', description: '' })
 
 const totalPages = computed(() => Math.ceil(total.value / pageSize))
@@ -192,11 +336,54 @@ function debouncedLoad() {
   debounceTimer = setTimeout(() => loadAssets(), 500)
 }
 
+function debouncedAdvSearch() {
+  clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => runAdvancedSearch(), 500)
+}
+
+function toggleAdvancedSearch() {
+  showAdvanced.value = !showAdvanced.value
+  page.value = 1
+  if (showAdvanced.value) {
+    runAdvancedSearch()
+  } else {
+    advSearchActive.value = false
+    loadAssets()
+  }
+}
+
 async function loadAssets() {
   loading.value = true
   try {
-    const params = { page: page.value, pageSize, ...filter.value }
+    const params = {
+      page: page.value,
+      pageSize,
+      sortBy: currentSort.value,
+      sortDir: currentSortDir.value,
+      ...filter.value
+    }
     const res = await api.get('/assets', { params })
+    assets.value = res.data.data.items
+    total.value = res.data.data.totalCount
+  } catch (e) {
+    console.error(e)
+  } finally {
+    loading.value = false
+  }
+}
+
+async function runAdvancedSearch() {
+  loading.value = true
+  advSearchActive.value = true
+  try {
+    const params = {
+      page: page.value,
+      pageSize,
+      sortBy: currentSort.value,
+      sortDir: currentSortDir.value,
+      ...advSearch.value
+    }
+    const res = await api.get('/assets/search', { params })
     assets.value = res.data.data.items
     total.value = res.data.data.totalCount
   } catch (e) {
@@ -212,7 +399,7 @@ async function createAsset() {
     await api.post('/assets', newAsset.value)
     showCreate.value = false
     newAsset.value = { name: '', hostname: '', ipAddress: '', assetType: 'server', osName: '', criticality: 'medium', description: '' }
-    await loadAssets()
+    await (showAdvanced.value ? runAdvancedSearch() : loadAssets())
   } catch (e) {
     alert('خطا در ایجاد دارایی')
   } finally {
@@ -223,16 +410,57 @@ async function createAsset() {
 async function deleteAsset(asset) {
   if (!confirm(`آیا از حذف "${asset.name}" مطمئن هستید؟`)) return
   await api.delete(`/assets/${asset.id}`)
-  await loadAssets()
+  await (showAdvanced.value ? runAdvancedSearch() : loadAssets())
 }
 
 function resetFilter() {
   filter.value = { search: '', assetType: '', status: '', criticality: '' }
+  page.value = 1
   loadAssets()
 }
 
-function prevPage() { if (page.value > 1) { page.value--; loadAssets() } }
-function nextPage() { if (page.value < totalPages.value) { page.value++; loadAssets() } }
+function resetAdvancedSearch() {
+  advSearch.value = {
+    keyword: '', hostname: '', ipAddress: '', macAddress: '',
+    assetType: '', osName: '', owner: '', status: '', criticality: '',
+    riskLevel: '', discoveredFrom: '', discoveredTo: '',
+    cpe: '', softwareName: '', softwareVersion: '', softwareVendor: '',
+    includeGlpi: false
+  }
+  page.value = 1
+  runAdvancedSearch()
+}
+
+function sortBy(field) {
+  if (currentSort.value === field) {
+    currentSortDir.value = currentSortDir.value === 'asc' ? 'desc' : 'asc'
+  } else {
+    currentSort.value = field
+    currentSortDir.value = 'asc'
+  }
+  page.value = 1
+  showAdvanced.value ? runAdvancedSearch() : loadAssets()
+}
+
+function sortIcon(field) {
+  if (currentSort.value !== field) return '↕'
+  return currentSortDir.value === 'asc' ? '↑' : '↓'
+}
+
+// Highlight matched keyword in text
+function highlight(text) {
+  if (!text) return ''
+  const kw = showAdvanced.value ? advSearch.value.keyword : filter.value.search
+  if (!kw || !kw.trim()) return text
+  const escaped = kw.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&')
+  return String(text).replace(
+    new RegExp(`(${escaped})`, 'gi'),
+    '<mark class="bg-yellow-500/30 text-yellow-200 rounded px-0.5">$1</mark>'
+  )
+}
+
+function prevPage() { if (page.value > 1) { page.value--; showAdvanced.value ? runAdvancedSearch() : loadAssets() } }
+function nextPage() { if (page.value < totalPages.value) { page.value++; showAdvanced.value ? runAdvancedSearch() : loadAssets() } }
 
 function assetTypeFa(t) { return { server: 'سرور', workstation: 'ایستگاه کاری', network: 'شبکه', iot: 'IoT', mobile: 'موبایل', security: 'امنیتی' }[t] || t }
 function typeIcon(t) { return { server: '🖥️', workstation: '💻', network: '🌐', iot: '📡', mobile: '📱', security: '🔒' }[t] || '📦' }
