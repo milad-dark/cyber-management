@@ -84,6 +84,7 @@ builder.Services.AddAuthorization();
 // ─── Application Services ─────────────────────────────────
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IAssetService, AssetService>();
+builder.Services.AddScoped<ISearchService, SearchService>();
 builder.Services.AddScoped<IVulnerabilityService, VulnerabilityService>();
 builder.Services.AddScoped<IRiskService, RiskService>();
 builder.Services.AddScoped<IThreatIntelService, ThreatIntelService>();

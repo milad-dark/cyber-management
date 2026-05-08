@@ -14,12 +14,14 @@ public class AssetsController : ControllerBase
     private readonly IAssetService _assets;
     private readonly IAuditService _audit;
     private readonly IGraphService _graph;
+    private readonly ISearchService _search;
 
-    public AssetsController(IAssetService assets, IAuditService audit, IGraphService graph)
+    public AssetsController(IAssetService assets, IAuditService audit, IGraphService graph, ISearchService search)
     {
         _assets = assets;
         _audit = audit;
         _graph = graph;
+        _search = search;
     }
 
     [HttpGet]
@@ -27,6 +29,23 @@ public class AssetsController : ControllerBase
     {
         var result = await _assets.GetAssetsAsync(filter);
         return Ok(new ApiResponse<PagedResult<AssetDto>>(true, result));
+    }
+
+    /// <summary>
+    /// Advanced / federated search — supports keyword, specific field filters, GLPI integration, and pagination.
+    /// Every call is audit-logged (who searched, what terms, when).
+    /// </summary>
+    [HttpGet("search")]
+    public async Task<ActionResult<ApiResponse<PagedResult<UnifiedAssetDto>>>> SearchAssets(
+        [FromQuery] AdvancedAssetSearchRequest request)
+    {
+        var userId = GetUserId();
+        var searchDesc = BuildSearchDescription(request);
+        await _audit.LogAsync(userId, GetUsername(), "SEARCH", "Asset", null,
+            searchDesc, GetIpAddress());
+
+        var result = await _search.SearchAsync(request);
+        return Ok(new ApiResponse<PagedResult<UnifiedAssetDto>>(true, result));
     }
 
     [HttpGet("{id:guid}")]
@@ -78,6 +97,30 @@ public class AssetsController : ControllerBase
         var graph = await _graph.GetAssetNetworkAsync(id, depth);
         return Ok(new ApiResponse<object>(true, graph));
     }
+
+    private static string BuildSearchDescription(AdvancedAssetSearchRequest r)
+    {
+        var parts = new List<string>();
+        if (!string.IsNullOrWhiteSpace(r.Keyword))     parts.Add($"کلیدواژه:{Sanitize(r.Keyword)}");
+        if (!string.IsNullOrWhiteSpace(r.Hostname))    parts.Add($"hostname:{Sanitize(r.Hostname)}");
+        if (!string.IsNullOrWhiteSpace(r.IpAddress))   parts.Add($"ip:{Sanitize(r.IpAddress)}");
+        if (!string.IsNullOrWhiteSpace(r.MacAddress))  parts.Add($"mac:{Sanitize(r.MacAddress)}");
+        if (!string.IsNullOrWhiteSpace(r.AssetType))   parts.Add($"نوع:{Sanitize(r.AssetType)}");
+        if (!string.IsNullOrWhiteSpace(r.OsName))      parts.Add($"os:{Sanitize(r.OsName)}");
+        if (!string.IsNullOrWhiteSpace(r.Owner))       parts.Add($"مالک:{Sanitize(r.Owner)}");
+        if (!string.IsNullOrWhiteSpace(r.Status))      parts.Add($"وضعیت:{Sanitize(r.Status)}");
+        if (!string.IsNullOrWhiteSpace(r.RiskLevel))   parts.Add($"ریسک:{Sanitize(r.RiskLevel)}");
+        if (!string.IsNullOrWhiteSpace(r.Cpe))         parts.Add($"cpe:{Sanitize(r.Cpe)}");
+        if (!string.IsNullOrWhiteSpace(r.SoftwareName))parts.Add($"نرم‌افزار:{Sanitize(r.SoftwareName)}");
+        if (r.DiscoveredFrom.HasValue)                 parts.Add($"از:{r.DiscoveredFrom:yyyy-MM-dd}");
+        if (r.DiscoveredTo.HasValue)                   parts.Add($"تا:{r.DiscoveredTo:yyyy-MM-dd}");
+        if (r.IncludeGlpi)                             parts.Add("شامل-GLPI");
+        return parts.Count > 0 ? $"جستجوی پیشرفته دارایی‌ها [{string.Join(", ", parts)}]" : "جستجوی پیشرفته دارایی‌ها";
+    }
+
+    /// <summary>Removes newlines and control characters to prevent audit log injection.</summary>
+    private static string Sanitize(string? value) =>
+        value?.Replace("\n", " ").Replace("\r", " ").Replace("\t", " ") ?? string.Empty;
 
     private Guid? GetUserId()
     {

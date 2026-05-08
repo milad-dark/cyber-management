@@ -8,6 +8,7 @@ namespace CyberManagement.Api.Services;
 public interface IAssetService
 {
     Task<PagedResult<AssetDto>> GetAssetsAsync(AssetFilterRequest filter);
+    Task<PagedResult<UnifiedAssetDto>> AdvancedSearchAsync(AdvancedAssetSearchRequest request);
     Task<AssetDetailDto?> GetAssetByIdAsync(Guid id);
     Task<AssetDto> CreateAssetAsync(CreateAssetRequest request, Guid? userId);
     Task<AssetDto?> UpdateAssetAsync(Guid id, UpdateAssetRequest request);
@@ -213,6 +214,169 @@ public class AssetService : IAssetService
     }
 
     public async Task<int> GetTotalCountAsync() => await _db.Assets.CountAsync();
+
+    public async Task<PagedResult<UnifiedAssetDto>> AdvancedSearchAsync(AdvancedAssetSearchRequest request)
+    {
+        var query = _db.Assets
+            .Include(a => a.Category)
+            .Include(a => a.Location)
+            .Include(a => a.Owner)
+            .Include(a => a.RiskScore)
+            .Include(a => a.AssetVulnerabilities)
+            .AsQueryable();
+
+        // Keyword / global free-text (matches name, hostname, IP, MAC, OS, description, CPE)
+        if (!string.IsNullOrWhiteSpace(request.Keyword))
+        {
+            var kw = request.Keyword.ToLower();
+            query = query.Where(a =>
+                a.Name.ToLower().Contains(kw) ||
+                (a.Hostname != null && a.Hostname.ToLower().Contains(kw)) ||
+                (a.IpAddress != null && a.IpAddress.ToLower().Contains(kw)) ||
+                (a.MacAddress != null && a.MacAddress.ToLower().Contains(kw)) ||
+                (a.OsName != null && a.OsName.ToLower().Contains(kw)) ||
+                (a.Description != null && a.Description.ToLower().Contains(kw)) ||
+                (a.Cpe != null && a.Cpe.ToLower().Contains(kw)) ||
+                (a.Manufacturer != null && a.Manufacturer.ToLower().Contains(kw)) ||
+                (a.Model != null && a.Model.ToLower().Contains(kw)) ||
+                (a.Department != null && a.Department.ToLower().Contains(kw)));
+        }
+
+        // Specific field filters
+        if (!string.IsNullOrWhiteSpace(request.Hostname))
+        {
+            var h = request.Hostname.ToLower();
+            query = query.Where(a => a.Hostname != null && a.Hostname.ToLower().Contains(h));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.IpAddress))
+        {
+            var ip = request.IpAddress.ToLower();
+            query = query.Where(a => a.IpAddress != null && a.IpAddress.ToLower().Contains(ip));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.MacAddress))
+        {
+            var mac = request.MacAddress.ToLower().Replace(":", "").Replace("-", "");
+            query = query.Where(a => a.MacAddress != null &&
+                a.MacAddress.ToLower().Replace(":", "").Replace("-", "").Contains(mac));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.AssetType))
+            query = query.Where(a => a.AssetType == request.AssetType);
+
+        if (!string.IsNullOrWhiteSpace(request.OsName))
+        {
+            var os = request.OsName.ToLower();
+            query = query.Where(a => a.OsName != null && a.OsName.ToLower().Contains(os));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Owner))
+        {
+            var owner = request.Owner.ToLower();
+            query = query.Where(a => a.Owner != null &&
+                ((a.Owner.FullName != null && a.Owner.FullName.ToLower().Contains(owner)) ||
+                 a.Owner.Username.ToLower().Contains(owner)));
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Status))
+            query = query.Where(a => a.Status == request.Status);
+
+        if (!string.IsNullOrWhiteSpace(request.Criticality))
+            query = query.Where(a => a.Criticality == request.Criticality);
+
+        if (!string.IsNullOrWhiteSpace(request.RiskLevel))
+        {
+            query = request.RiskLevel.ToLower() switch
+            {
+                "critical" => query.Where(a => a.RiskScore != null && a.RiskScore.OverallScore >= 75),
+                "high"     => query.Where(a => a.RiskScore != null && a.RiskScore.OverallScore >= 50 && a.RiskScore.OverallScore < 75),
+                "medium"   => query.Where(a => a.RiskScore != null && a.RiskScore.OverallScore >= 25 && a.RiskScore.OverallScore < 50),
+                "low"      => query.Where(a => a.RiskScore == null || a.RiskScore.OverallScore < 25),
+                _ => query
+            };
+        }
+
+        if (request.DiscoveredFrom.HasValue)
+            query = query.Where(a => a.FirstSeen >= request.DiscoveredFrom.Value);
+
+        if (request.DiscoveredTo.HasValue)
+            query = query.Where(a => a.FirstSeen <= request.DiscoveredTo.Value);
+
+        if (!string.IsNullOrWhiteSpace(request.Cpe))
+        {
+            var cpe = request.Cpe.ToLower();
+            query = query.Where(a => a.Cpe != null && a.Cpe.ToLower().Contains(cpe));
+        }
+
+        var total = await query.CountAsync();
+
+        query = (request.SortBy?.ToLower()) switch
+        {
+            "hostname"   => request.SortDir == "desc" ? query.OrderByDescending(a => a.Hostname) : query.OrderBy(a => a.Hostname),
+            "ipaddress"  => request.SortDir == "desc" ? query.OrderByDescending(a => a.IpAddress) : query.OrderBy(a => a.IpAddress),
+            "status"     => request.SortDir == "desc" ? query.OrderByDescending(a => a.Status) : query.OrderBy(a => a.Status),
+            "criticality"=> request.SortDir == "desc" ? query.OrderByDescending(a => a.Criticality) : query.OrderBy(a => a.Criticality),
+            "riskscore"  => request.SortDir == "desc"
+                ? query.OrderByDescending(a => a.RiskScore != null ? a.RiskScore.OverallScore : (decimal?)null)
+                : query.OrderBy(a => a.RiskScore != null ? a.RiskScore.OverallScore : (decimal?)null),
+            "lastseen"   => request.SortDir == "desc" ? query.OrderByDescending(a => a.LastSeen) : query.OrderBy(a => a.LastSeen),
+            "firstseen"  => request.SortDir == "desc" ? query.OrderByDescending(a => a.FirstSeen) : query.OrderBy(a => a.FirstSeen),
+            _            => request.SortDir == "desc" ? query.OrderByDescending(a => a.Name) : query.OrderBy(a => a.Name)
+        };
+
+        var items = await query
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
+            .ToListAsync();
+
+        var kw2 = request.Keyword?.ToLower();
+        var dtos = items.Select(a =>
+        {
+            var dto = new UnifiedAssetDto
+            {
+                Id = a.Id,
+                Name = a.Name,
+                Hostname = a.Hostname,
+                IpAddress = a.IpAddress,
+                MacAddress = a.MacAddress,
+                AssetType = a.AssetType,
+                CategoryName = a.Category?.NameFa ?? a.Category?.Name,
+                LocationName = a.Location?.NameFa ?? a.Location?.Name,
+                Status = a.Status,
+                Criticality = a.Criticality,
+                OsName = a.OsName,
+                OsVersion = a.OsVersion,
+                Manufacturer = a.Manufacturer,
+                Model = a.Model,
+                Department = a.Department,
+                Description = a.Description,
+                Tags = a.Tags,
+                VulnerabilityCount = a.AssetVulnerabilities?.Count ?? 0,
+                CriticalVulnCount = a.AssetVulnerabilities?.Count(av => av.Vulnerability?.Severity == "critical") ?? 0,
+                RiskScore = a.RiskScore?.OverallScore,
+                FirstSeen = a.FirstSeen,
+                LastSeen = a.LastSeen,
+                CreatedAt = a.CreatedAt,
+                Source = "internal"
+            };
+
+            // Determine which field matched for highlighting hint
+            if (!string.IsNullOrWhiteSpace(kw2))
+            {
+                if (a.IpAddress != null && a.IpAddress.ToLower().Contains(kw2)) dto.MatchedField = "ipAddress";
+                else if (a.Hostname != null && a.Hostname.ToLower().Contains(kw2)) dto.MatchedField = "hostname";
+                else if (a.MacAddress != null && a.MacAddress.ToLower().Contains(kw2)) dto.MatchedField = "macAddress";
+                else if (a.OsName != null && a.OsName.ToLower().Contains(kw2)) dto.MatchedField = "osName";
+                else if (a.Cpe != null && a.Cpe.ToLower().Contains(kw2)) dto.MatchedField = "cpe";
+                else dto.MatchedField = "name";
+            }
+
+            return dto;
+        }).ToList();
+
+        return new PagedResult<UnifiedAssetDto>(dtos, total, request.Page, request.PageSize);
+    }
 
     private static AssetDto MapToDto(Asset a) => new()
     {
